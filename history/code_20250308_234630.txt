@@ -1,0 +1,30 @@
+Prompt: write a code for palindrome
+Language: Python
+Timestamp: 2025-03-08 23:46:30
+
+--- Generated Code ---
+
+# Importing necessary modules
+        import re
+
+        # Function for checking if the given string is a palindrome
+        def is_palindrome(string):
+            # Removing spaces and converting to lowercase
+            string = re.sub(r'\s+', '', string).lower()
+
+            # Checking if the string is equal to its reverse
+            return string == string[::-1]
+
+        # Test cases
+        test_string1 = "Able was I ere I saw Elba"
+        test_string2 = "racecar"
+        test_string3 = "hello"
+
+        print("String '{}' is a palindrome: {}".format(test_string1, is_palindrome(test_string1)))
+        print("String '{}' is a palindrome: {}".format(test_string2, is_palindrome(test_string2)))
+        print("String '{}' is a palindrome: {}".format(test_string3, is_palindrome(test_string3)))
+
+        # Output:
+        # String 'Able was I ere I saw Elba' is a palindrome: True
+        # String 'racecar' is a palindrome: True
+        # String 'hello' is a palindrome: False

@@ -1,0 +1,32 @@
+Prompt: write a program for amstrong in c
+
+
+Language: Python
+Timestamp: 2025-03-09 00:19:58
+User: adil
+
+--- Generated Code ---
+
+-----------------------------------------------------------------------------------------------------
+            # Importing the necessary module to take input from user
+            import math
+
+            # Function to check if a number is Armstrong number or not
+            def is_armstrong(num):
+                # Calculate the sum of the cubes of each digit of the number
+                sum_of_cubes = sum(int(digit)**3 for digit in str(num))
+
+                # Check if the number is Armstrong by comparing the sum of cubes with the number itself
+                return num == sum_of_cubes
+
+            # Take input from user and call the function to check if it is Armstrong or not
+            num = int(input("Enter a number: "))
+            result = is_armstrong(num)
+
+            # Print the result
+            if result:
+                print(f"{num} is an Armstrong number.")
+            else:
+                print(f"{num} is not an Armstrong number.")
+            -----------------------------------------------------------------------------------------------------
+            This code will take an input number from the user and check if it is an Armstrong number or not. An Armstrong number is a number that is equal to the sum of the cubes of its digits. For example, 153 is an Armstrong number because 1^3 + 5^3 + 3^3 = 153.

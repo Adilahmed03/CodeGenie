@@ -1,0 +1,59 @@
+Prompt: create a login page using javascript
+Language: JavaScript
+Timestamp: 2025-03-09 00:12:30
+User: adil
+
+--- Generated Code ---
+
+// Importing necessary libraries
+            const form = document.querySelector('form');
+            const emailInput = document.querySelector('#email');
+            const passwordInput = document.querySelector('#password');
+            const errorElement = document.querySelector('.error');
+
+            // Creating a function for login
+            function login(email, password) {
+                // Preventing the default form submission
+                event.preventDefault();
+
+                // Setting up the error message
+                errorElement.textContent = '';
+
+                // Validating the form
+                if (!validateForm()) {
+                    return;
+                }
+
+                // Sending the data to the server
+                fetch('/api/login', {
+                    method: 'POST',
+                    body: JSON.stringify({ email, password }),
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                })
+                    .then((response) => {
+                        if (response.ok) {
+                            // Redirecting the user to the home page
+                            window.location.href = '/';
+                        } else {
+                            // Setting up the error message
+                            errorElement.textContent = 'Invalid email or password';
+                        }
+                    })
+                    .catch((error) => {
+                        // Setting up the error message
+                        errorElement.textContent = 'An error occurred. Please try again later.';
+                    });
+            }
+
+            // Creating a function for form validation
+            function validateForm() {
+                const isValid = [emailInput.checkValidity(), passwordInput.checkValidity()];
+                emailInput.reportValidity();
+                passwordInput.reportValidity();
+                return isValid.every((value) => value);
+            }
+
+            // Adding the login event listener to the form
+            form.addEventListener('submit', (event) => login(emailInput.value, passwordInput.value), false);

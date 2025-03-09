@@ -1,0 +1,52 @@
+Prompt: create a Python program for palindrome
+Language: Python
+Timestamp: 2025-03-09 09:29:49
+User: adil
+
+--- Generated Code ---
+
+-------------------------------
+                '''
+                # Importing necessary modules
+                import re
+
+                # Function to check if a given string is palindrome
+                def is_palindrome(string):
+                    # Using regular expression to remove all non-alphanumeric characters
+                    # and convert all characters to lowercase
+                    string = re.sub(r'\W+', '', string).lower()
+
+                    # Reversing the string
+                    reversed_string = string[::-1]
+
+                    # Checking if both strings are same or not
+                    if string == reversed_string:
+                        return True
+                    else:
+                        return False
+
+                # Testing the function
+                print(is_palindrome("racecar"))
+                print(is_palindrome("hello"))
+                '''
+                ----------------------------------
+                '''
+                # Importing necessary modules
+                import re
+
+                # Function to check if a given string is palindrome
+                def is_palindrome(string):
+                    # Removing all non-alphanumeric characters and converting all characters to lowercase
+                    string = re.sub(r'\W+', '', string).lower()
+
+                    # Reversing the string
+                    reversed_string = string[::-1]
+
+                    # Checking if both strings are same or not
+                    return string == reversed_string
+
+                # Testing the function
+                print(is_palindrome("racecar"))
+                print(is_palindrome("hello"))
+                '''
+                The above code is a Python function to check if a given string is a palindrome or not. It uses regular expressions to remove all non-alphanumeric characters and converts all characters to lowercase. Then it reverses the string and checks if both strings are the same or not.

@@ -1,0 +1,59 @@
+Prompt: write a code on 1-100 prime numbers using Java
+Language: Java
+Timestamp: 2025-03-09 09:32:26
+User: adil
+
+--- Generated Code ---
+
+--------------------------------------------------------------------------------------------------
+                import java.util.ArrayList;
+                import java.util.List;
+
+                /**
+                 * Function to find prime numbers between 1 and 100
+                 * @return list of prime numbers between 1 and 100
+                 */
+                 public static List<Integer> findPrimes(int max) {
+                     List<Boolean> primeCheck = new ArrayList<>(max + 1);
+
+                     // Initialize first few values as prime
+                     for (int i = 0; i <= max; i++) {
+                         primeCheck.add(true);
+                     }
+
+                     // Set 0 and 1 as non-prime
+                     primeCheck.set(0, false);
+                     primeCheck.set(1, false);
+
+                     for (int p = 2; p * p <= max; p++) {
+                         // If prime[p] is not changed, then it is a prime
+                         if (primeCheck.get(p)) {
+                             for (int i = p * p; i <= max; i += p) {
+                                 primeCheck.set(i, false);
+                             }
+                         }
+                     }
+
+                     // Create a list of prime numbers and return it
+                     List<Integer> primes = new ArrayList<>();
+                     for (int i = 0; i <= max; i++) {
+                         if (primeCheck.get(i)) {
+                             primes.add(i);
+                         }
+                     }
+                     return primes;
+                 }
+                --------------------------------------------------------------------------------------------------
+                 **Explanation:**
+
+                 The Java code above implements a function `findPrimes` that returns a list of prime numbers between 1 and 100.
+
+                 **Imports:**
+
+                 We import the required classes `java.util.ArrayList` and `java.util.List` for using ArrayLists.
+
+                 **Variables:**
+
+                 We initialize an ArrayList `primeCheck` of size `max + 1` to keep track of prime numbers. A boolean value is assigned to each index representing whether it is a prime number or not.
+
+                 **
