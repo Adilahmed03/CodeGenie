@@ -6,7 +6,7 @@ import re
 from datetime import datetime
 from login import authenticate_user, initialize_user_database  # Import the login functions
 import time
-
+import speech_recognition as sr
 
 # Initialize the user database at startup
 initialize_user_database()
@@ -316,172 +316,6 @@ else:
         </div>
         """, unsafe_allow_html=True)
 
-    # Sidebar for settings with animations
-    with st.sidebar:
-        st.markdown("""
-        <div style="animation: slideInLeft 0.6s ease-out;">
-            <h2>✨ Settings</h2>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # List of all supported programming languages
-        all_languages = [
-            "Python", "JavaScript", "Java", "C++", "C", "C#", "Go", "Ruby", 
-            "PHP", "Swift", "Kotlin", "Rust", "TypeScript", "HTML", "CSS", 
-            "SQL", "Shell/Bash", "Perl", "R", "MATLAB"
-        ]
-        
-        # Initialize programming_language in session state if not already there
-        if "programming_language" not in st.session_state:
-            st.session_state["programming_language"] = "Python"
-        
-        # Allow manual override with a checkbox
-        auto_detect = st.checkbox("Auto-detect language from prompt", value=True)
-        
-        # Only show manual selection if auto-detect is off
-        if not auto_detect:
-            programming_language = st.selectbox(
-                "Programming Language",
-                all_languages,
-                index=all_languages.index(st.session_state["programming_language"]) if st.session_state["programming_language"] in all_languages else 0
-            )
-            st.session_state["programming_language"] = programming_language
-        
-        # Model selection with visual indicators
-        st.markdown("""
-        <div style="animation: fadeIn 0.8s ease-out;">
-            <h3>Model Selection</h3>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        model_options = {
-            "Mistral 7B Instruct": "mistralai/Mistral-7B-Instruct-v0.2",
-            "CodeLlama 7B Instruct": "codellama/CodeLlama-7b-Instruct-hf",
-            "Bloomz 7B1": "bigscience/bloomz-7b1"
-        }
-        
-        # Prepare model cards with icons
-        models_html = ""
-        for model_name in model_options.keys():
-            icon = "🔮" if "Mistral" in model_name else "🦙" if "CodeLlama" in model_name else "🌸"
-            models_html += f"<option value='{model_name}'>{icon} {model_name}</option>"
-        
-        selected_model = st.selectbox("Select AI Model", list(model_options.keys()))
-        model_id = model_options[selected_model]
-        
-        # Hidden settings (not visible to user but still functional)
-        max_length = 500  # Default value
-        temperature = 0.7  # Default value
-        api_key = DEFAULT_API_KEY  # Default value
-        
-        # Add a history tab directly in the sidebar
-        st.markdown("""
-        <div style="animation: fadeIn 0.8s ease-out;">
-            <h3>Your Code History</h3>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Create history directory if it doesn't exist
-        if not os.path.exists("history"):
-            os.makedirs("history")
-        
-        # Get list of history files specific to the current user
-        history_files = []
-        for filename in os.listdir("history"):
-            if filename.startswith("code_") and filename.endswith(".txt"):
-                # Read the file to check if it belongs to the current user
-                with open(os.path.join("history", filename), "r") as f:
-                    content = f.read()
-                    if f"User: {st.session_state['username']}" in content:
-                        history_files.append(filename)
-        
-        # Sort by timestamp (newest first)
-        history_files.sort(reverse=True)
-        
-        if not history_files:
-            st.info("No code history found. Generate some code first!")
-        else:
-            # Create history cards with animation
-            for i, filename in enumerate(history_files):
-                with open(os.path.join("history", filename), "r") as f:
-                    content = f.read()
-                
-                # Extract metadata
-                prompt = "Unknown"
-                language = "Unknown"
-                timestamp = "Unknown"
-                
-                for line in content.split("\n"):
-                    if line.startswith("Prompt:"):
-                        prompt = line[8:].strip()
-                    elif line.startswith("Language:"):
-                        language = line[10:].strip()
-                    elif line.startswith("Timestamp:"):
-                        timestamp = line[11:].strip()
-                    elif line.startswith("--- Generated Code ---"):
-                        break
-                
-                # Extract the code
-                code_parts = content.split("--- Generated Code ---")
-                if len(code_parts) > 1:
-                    code = code_parts[1].strip()
-                else:
-                    code = "No code found"
-                
-                # Create a card for each history item with staggered animation
-                st.markdown(f"""
-                <div style="animation: slideInLeft {0.5 + i*0.1}s ease-out;">
-                    <h4>{language} - {timestamp.split()[0]}</h4>
-                    <p style="font-size: 0.9em;">{prompt[:75]}{"..." if len(prompt) > 75 else ""}</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Determine language for syntax highlighting
-                highlight_lang = language.lower()
-                if highlight_lang == "shell/bash":
-                    highlight_lang = "bash"
-                
-                with st.expander("Show Code"):
-                    st.code(code, language=highlight_lang)
-                    
-                    # File extension for download
-                    file_ext = file_extensions.get(language, language.lower())
-                    
-                    # Create download button for this history item
-                    st.download_button(
-                        label="📥 Download This Code",
-                        data=code,
-                        file_name=f"history_code_{filename.replace('.txt', '')}.{file_ext}",
-                        mime="text/plain"
-                    )
-                
-                st.markdown("<hr style='margin: 8px 0; opacity: 0.3;'>", unsafe_allow_html=True)
-        
-        # Add a logout button to the sidebar with animation
-        st.markdown("""
-        <div style="animation: fadeIn 1s ease-out; margin-top: 20px;">
-        """, unsafe_allow_html=True)
-        if st.button("Logout"):
-            # Add a logout animation
-            st.markdown("""
-            <div style="text-align: center; animation: fadeIn 0.5s ease-out;">
-                <p>Logging out...</p>
-            </div>
-            """, unsafe_allow_html=True)
-            time.sleep(1)  # Brief pause for animation
-            st.session_state["authenticated"] = False
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        st.markdown("---")
-        st.markdown("""
-        <div style="animation: slideInLeft 1s ease-out;">
-            <h3>About CodeGenie</h3>
-            <p>CodeGenie uses AI models to generate code based on natural language descriptions.
-            This tool helps developers save time and reduce errors by automating code generation.</p>
-        </div>
-        """, unsafe_allow_html=True)
-
     # Function to generate code using Hugging Face Inference API
     def generate_code_api(prompt, language, model_id, max_length, temperature, api_key=DEFAULT_API_KEY):
         # API endpoint
@@ -700,6 +534,172 @@ else:
             f.write("\n--- Generated Code ---\n\n")
             f.write(code)
 
+    # Sidebar for settings with animations
+    with st.sidebar:
+        st.markdown("""
+        <div style="animation: slideInLeft 0.6s ease-out;">
+            <h2>✨ Settings</h2>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # List of all supported programming languages
+        all_languages = [
+            "Python", "JavaScript", "Java", "C++", "C", "C#", "Go", "Ruby", 
+            "PHP", "Swift", "Kotlin", "Rust", "TypeScript", "HTML", "CSS", 
+            "SQL", "Shell/Bash", "Perl", "R", "MATLAB"
+        ]
+        
+        # Initialize programming_language in session state if not already there
+        if "programming_language" not in st.session_state:
+            st.session_state["programming_language"] = "Python"
+        
+        # Allow manual override with a checkbox
+        auto_detect = st.checkbox("Auto-detect language from prompt", value=True)
+        
+        # Only show manual selection if auto-detect is off
+        if not auto_detect:
+            programming_language = st.selectbox(
+                "Programming Language",
+                all_languages,
+                index=all_languages.index(st.session_state["programming_language"]) if st.session_state["programming_language"] in all_languages else 0
+            )
+            st.session_state["programming_language"] = programming_language
+        
+        # Model selection with visual indicators
+        st.markdown("""
+        <div style="animation: fadeIn 0.8s ease-out;">
+            <h3>Model Selection</h3>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        model_options = {
+            "Mistral 7B Instruct": "mistralai/Mistral-7B-Instruct-v0.2",
+            "CodeLlama 7B Instruct": "codellama/CodeLlama-7b-Instruct-hf",
+            "Bloomz 7B1": "bigscience/bloomz-7b1"
+        }
+        
+        # Prepare model cards with icons
+        models_html = ""
+        for model_name in model_options.keys():
+            icon = "🔮" if "Mistral" in model_name else "🦙" if "CodeLlama" in model_name else "🌸"
+            models_html += f"<option value='{model_name}'>{icon} {model_name}</option>"
+        
+        selected_model = st.selectbox("Select AI Model", list(model_options.keys()))
+        model_id = model_options[selected_model]
+        
+        # Hidden settings (not visible to user but still functional)
+        max_length = 500  # Default value
+        temperature = 0.7  # Default value
+        api_key = DEFAULT_API_KEY  # Default value
+        
+        # Add a history tab directly in the sidebar
+        st.markdown("""
+        <div style="animation: fadeIn 0.8s ease-out;">
+            <h3>Your Code History</h3>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Create history directory if it doesn't exist
+        if not os.path.exists("history"):
+            os.makedirs("history")
+        
+        # Get list of history files specific to the current user
+        history_files = []
+        for filename in os.listdir("history"):
+            if filename.startswith("code_") and filename.endswith(".txt"):
+                # Read the file to check if it belongs to the current user
+                with open(os.path.join("history", filename), "r") as f:
+                    content = f.read()
+                    if f"User: {st.session_state['username']}" in content:
+                        history_files.append(filename)
+        
+        # Sort by timestamp (newest first)
+        history_files.sort(reverse=True)
+        
+        if not history_files:
+            st.info("No code history found. Generate some code first!")
+        else:
+            # Create history cards with animation
+            for i, filename in enumerate(history_files):
+                with open(os.path.join("history", filename), "r") as f:
+                    content = f.read()
+                
+                # Extract metadata
+                prompt = "Unknown"
+                language = "Unknown"
+                timestamp = "Unknown"
+                
+                for line in content.split("\n"):
+                    if line.startswith("Prompt:"):
+                        prompt = line[8:].strip()
+                    elif line.startswith("Language:"):
+                        language = line[10:].strip()
+                    elif line.startswith("Timestamp:"):
+                        timestamp = line[11:].strip()
+                    elif line.startswith("--- Generated Code ---"):
+                        break
+                
+                # Extract the code
+                code_parts = content.split("--- Generated Code ---")
+                if len(code_parts) > 1:
+                    code = code_parts[1].strip()
+                else:
+                    code = "No code found"
+                
+                # Create a card for each history item with staggered animation
+                st.markdown(f"""
+                <div style="animation: slideInLeft {0.5 + i*0.1}s ease-out;">
+                    <h4>{language} - {timestamp.split()[0]}</h4>
+                    <p style="font-size: 0.9em;">{prompt[:75]}{"..." if len(prompt) > 75 else ""}</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Determine language for syntax highlighting
+                highlight_lang = language.lower()
+                if highlight_lang == "shell/bash":
+                    highlight_lang = "bash"
+                
+                with st.expander("Show Code"):
+                    st.code(code, language=highlight_lang)
+                    
+                    # File extension for download
+                    file_ext = file_extensions.get(language, language.lower())
+                    
+                    # Create download button for this history item
+                    st.download_button(
+                        label="📥 Download This Code",
+                        data=code,
+                        file_name=f"history_code_{filename.replace('.txt', '')}.{file_ext}",
+                        mime="text/plain"
+                    )
+                
+                st.markdown("<hr style='margin: 8px 0; opacity: 0.3;'>", unsafe_allow_html=True)
+        
+        # Add a logout button to the sidebar with animation
+        st.markdown("""
+        <div style="animation: fadeIn 1s ease-out; margin-top: 20px;">
+        """, unsafe_allow_html=True)
+        if st.button("Logout"):
+            # Add a logout animation
+            st.markdown("""
+            <div style="text-align: center; animation: fadeIn 0.5s ease-out;">
+                <p>Logging out...</p>
+            </div>
+            """, unsafe_allow_html=True)
+            time.sleep(1)  # Brief pause for animation
+            st.session_state["authenticated"] = False
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        st.markdown("---")
+        st.markdown("""
+        <div style="animation: slideInLeft 1s ease-out;">
+            <h3>About CodeGenie</h3>
+            <p>CodeGenie uses AI models to generate code based on natural language descriptions.
+            This tool helps developers save time and reduce errors by automating code generation.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
     # Add tabs for different features with animated transitions
     st.markdown("""
     <div style="animation: fadeIn 1s ease-out;">
@@ -715,6 +715,25 @@ else:
         
         user_prompt = st.text_area("Describe the functionality you need:", height=150, 
                                 placeholder="Example: Create a Python function that takes a list of numbers and returns the average of the even numbers. Or: Create an HTML page with a responsive navbar and contact form using CSS.")
+        
+        # Add a microphone button for speech input
+        if st.button("🎤 Use Microphone"):
+            # Initialize recognizer
+            recognizer = sr.Recognizer()
+            
+            # Capture audio from microphone
+            with sr.Microphone() as source:
+                st.write("Please speak now...")
+                audio = recognizer.listen(source)
+            
+            # Convert speech to text
+            try:
+                user_prompt = recognizer.recognize_google(audio)
+                st.write("You said:", user_prompt)
+            except sr.UnknownValueError:
+                st.error("Sorry, I did not understand that.")
+            except sr.RequestError as e:
+                st.error(f"Could not request results; {e}")
         
         # Advanced options (collapsed by default)
         with st.expander("Advanced Options"):
@@ -749,7 +768,7 @@ else:
         if st.button("🪄 Generate Code", use_container_width=True):
             if user_prompt:
                 # Auto-detect language if enabled
-                if auto_detect:
+                if "auto_detect" in st.session_state and st.session_state["auto_detect"]:
                     detected_language = detect_language_from_prompt(user_prompt)
                     st.session_state["programming_language"] = detected_language
                     st.info(f"Auto-detected language: {detected_language}")
@@ -778,10 +797,10 @@ else:
                     generated_code, error = generate_code_api(
                         full_prompt, 
                         programming_language,
-                        model_id, 
-                        max_length, 
+                        model_id,
+                        max_length,
                         temperature,
-                        api_key
+                        api_key=DEFAULT_API_KEY
                     )
                 
                 # Handle the response
@@ -918,9 +937,12 @@ else:
             st.write(st.session_state)
             
             st.write("### Current Settings")
+            selected_model = "Mistral 7B Instruct"  # Define the selected_model variable
+            model_id = "mistral-7b-instruct"  # Define the model_id variable
+            max_length = 50  # Define a default value for max_length
+            temperature = 0.7  # Define a default value for temperature
             st.write({
                 "Model": selected_model,
-                "Model ID": model_id,
                 "Programming Language": st.session_state.get("programming_language", "Python"),
                 "Max Length": max_length,
                 "Temperature": temperature
