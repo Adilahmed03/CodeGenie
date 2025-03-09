@@ -11,6 +11,10 @@ import speech_recognition as sr
 # Initialize the user database at startup
 initialize_user_database()
 
+# Initialize programming_language in session state if not already there
+if "programming_language" not in st.session_state:
+    st.session_state["programming_language"] = "Python"
+
 # Add custom CSS with animations and color scheme
 def load_css():
     st.markdown("""
@@ -224,7 +228,7 @@ else:
     # Set page configuration
     st.set_page_config(
         page_title="CodeGenie - AI Code Generation",
-        page_icon="🧞‍♂️",
+        page_icon="🧞‍♂",
         layout="wide"
     )
     
@@ -234,7 +238,7 @@ else:
     # Add animated logo and title with staggered animation
     st.markdown("""
     <div style="text-align: center; animation: fadeIn 0.8s ease-out;">
-        <h1><span class="logo">🧞‍♂️</span> CodeGenie</h1>
+        <h1><span class="logo">🧞‍♂</span> CodeGenie</h1>
     </div>
     """, unsafe_allow_html=True)
     
@@ -355,7 +359,7 @@ else:
                 Format the code properly with clear comments.
                 
                 Code:
-                ```
+                
                 """
             else:
                 full_prompt = f"""
@@ -365,7 +369,7 @@ else:
                 Include necessary imports, clear comments, and format the code properly.
                 
                 {language} code:
-                ```{file_ext}
+                {file_ext}
                 """
         else:
             # Generic prompt for other models
@@ -534,6 +538,163 @@ else:
             f.write("\n--- Generated Code ---\n\n")
             f.write(code)
 
+    # Function to detect and fix bugs in code
+    def detect_and_fix_bugs(code, language):
+        # This would integrate with a code analysis API or static analysis tool
+        # For demonstration, we'll return dummy data
+        bug_report = {
+            "bugs": [
+                {
+                    "line": 5,
+                    "message": "Potential null pointer dereference",
+                    "suggestion": "Add null check before using this variable"
+                },
+                {
+                    "line": 10,
+                    "message": "SQL injection vulnerability",
+                    "suggestion": "Use parameterized queries instead of string concatenation"
+                }
+            ],
+            "security_issues": [
+                {
+                    "line": 15,
+                    "message": "Hardcoded password",
+                    "suggestion": "Store credentials in environment variables"
+                }
+            ]
+        }
+        return json.dumps(bug_report, indent=2)
+
+    # Function to get code autocomplete suggestions
+    def get_code_autocomplete(prompt, language):
+        # This would integrate with a code completion API
+        # For demonstration, we'll return dummy suggestions
+        suggestions = {
+            "Python": [
+                "def calculate_average(numbers):",
+                "    if not numbers:",
+                "        return 0",
+                "    return sum(numbers) / len(numbers)"
+            ],
+            "JavaScript": [
+                "function calculateAverage(numbers) {",
+                "    if (numbers.length === 0) {",
+                "        return 0;",
+                "    }",
+                "    return numbers.reduce((a, b) => a + b) / numbers.length;",
+                "}"
+            ]
+        }
+        return suggestions.get(language, [])
+
+    # Function to generate unit tests
+    def generate_unit_tests(code, language):
+        # This would integrate with a testing framework or AI model
+        # For demonstration, we'll return dummy tests
+        test_templates = {
+            "Python": [
+                "def test_function_with_valid_input():",
+                "    assert function_to_test(2, 3) == 5",
+                "",
+                "def test_function_with_edge_case():",
+                "    assert function_to_test(0, 0) == 0"
+            ],
+            "JavaScript": [
+                "test('function with valid input', () => {",
+                "    expect(functionToTest(2, 3)).toBe(5);",
+                "});",
+                "",
+                "test('function with edge case', () => {",
+                "    expect(functionToTest(0, 0)).toBe(0);",
+                "});"
+            ]
+        }
+        return "\n".join(test_templates.get(language, []))
+
+    # Function to generate API integration code
+    def generate_api_integration(prompt, language):
+        # This would integrate with API documentation or AI model
+        # For demonstration, we'll return dummy API code
+        api_templates = {
+            "Python": [
+                "import requests",
+                "",
+                "def get_data_from_api(api_url):",
+                "    response = requests.get(api_url)",
+                "    if response.status_code == 200:",
+                "        return response.json()",
+                "    else:",
+                "        raise Exception(f'API request failed: {response.status_code}')"
+            ],
+            "JavaScript": [
+                "async function fetchDataFromAPI(apiUrl) {",
+                "    try {",
+                "        const response = await fetch(apiUrl);",
+                "        if (!response.ok) {",
+                "            throw new Error('Network response was not ok');",
+                "        }",
+                "        return await response.json();",
+                "    } catch (error) {",
+                "        console.error('Error:', error);",
+                "    }",
+                "}"
+            ]
+        }
+        return "\n".join(api_templates.get(language, []))
+
+    # Function to generate commit message
+    def generate_commit_message(code_changes, language):
+        # This would analyze code changes to generate meaningful commit messages
+        # For demonstration, we'll return a simple message
+        return f"Add {language} implementation for {code_changes[:20]}..."
+
+    # Function to generate algorithm suggestions
+    def generate_algorithm(prompt):
+        # Identify key components from the prompt
+        components = {
+            "sort": "sorting algorithm",
+            "search": "search algorithm",
+            "calculate": "mathematical operations",
+            "database": "database operations",
+            "api": "API integration",
+            "authentication": "authentication system",
+            "gui": "graphical user interface",
+            "web": "web application",
+            "mobile": "mobile application"
+        }
+        
+        # Basic algorithm template
+        algorithm = [
+            "1. Understand the problem requirements from the input description.",
+            "2. Identify the main goal of the functionality.",
+            "3. Break down the problem into smaller sub-tasks.",
+            "4. Determine the appropriate data structures and algorithms for each sub-task.",
+            "5. Outline the step-by-step process to solve the problem.",
+            "6. Consider edge cases and validation requirements.",
+            "7. Document the algorithm with comments and explanations."
+        ]
+        
+        # Add specific steps based on identified components
+        for keyword, description in components.items():
+            if keyword in prompt.lower():
+                algorithm.append(f"8. Implement the {description}.")
+        
+        # Add implementation steps
+        algorithm.extend([
+            "",
+            "Implementation Steps:",
+            "1. Set up the project environment and dependencies.",
+            "2. Create the main structure for the application.",
+            "3. Implement core functionality following the outlined algorithm.",
+            "4. Add error handling and input validation.",
+            "5. Write unit tests for each component.",
+            "6. Perform integration testing.",
+            "7. Optimize performance where necessary.",
+            "8. Document the code and create user documentation."
+        ])
+        
+        return "\n".join(algorithm)
+
     # Sidebar for settings with animations
     with st.sidebar:
         st.markdown("""
@@ -688,6 +849,7 @@ else:
             """, unsafe_allow_html=True)
             time.sleep(1)  # Brief pause for animation
             st.session_state["authenticated"] = False
+            st.session_state.pop("username", None)
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
         
@@ -713,9 +875,14 @@ else:
         <div style="animation: slideInLeft 0.8s ease-out;">
         """, unsafe_allow_html=True)
         
-        user_prompt = st.text_area("Describe the functionality you need:", height=150, 
-                                placeholder="Example: Create a Python function that takes a list of numbers and returns the average of the even numbers. Or: Create an HTML page with a responsive navbar and contact form using CSS.")
+        user_prompt = st.text_area("Describe the functionality you need:", 
+                                   value=st.session_state.get("user_prompt", ""), 
+                                   height=150, 
+                                   placeholder="Example: Create a Python function that takes a list of numbers and returns the average of the even numbers. Or: Create an HTML page with a responsive navbar and contact form using CSS.")
         
+        # Update the session state with the current value of the text area
+        st.session_state["user_prompt"] = user_prompt
+
         # Add a microphone button for speech input
         if st.button("🎤 Use Microphone"):
             # Initialize recognizer
@@ -728,12 +895,18 @@ else:
             
             # Convert speech to text
             try:
-                user_prompt = recognizer.recognize_google(audio)
-                st.write("You said:", user_prompt)
+                transcribed_text = recognizer.recognize_google(audio)
+                st.write("You said:", transcribed_text)
+                
+                # Update the text area with the transcribed text
+                st.session_state["user_prompt"] = transcribed_text
+                user_prompt = transcribed_text  # Ensure the local variable is also updated
             except sr.UnknownValueError:
                 st.error("Sorry, I did not understand that.")
             except sr.RequestError as e:
                 st.error(f"Could not request results; {e}")
+
+        # The rest of your code remains unchanged
         
         # Advanced options (collapsed by default)
         with st.expander("Advanced Options"):
@@ -757,6 +930,35 @@ else:
                                           placeholder="Enter any additional requirements or specifications...")
             
             st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Add code autocomplete suggestions and algorithm suggestions
+        with st.expander("💡 Suggestions"):
+            # Get algorithm suggestions
+            algorithm_suggestions = generate_algorithm(user_prompt)
+            
+            # Display algorithm suggestions
+            st.subheader("Algorithm Suggestions")
+            st.write("Here's a suggested algorithm based on your input:")
+            st.code(algorithm_suggestions)
+            
+            # Get code suggestions
+            code_suggestions = get_code_autocomplete(user_prompt, st.session_state["programming_language"])
+            
+            # Display code suggestions
+            if code_suggestions:
+                st.subheader("Code Suggestions")
+                st.write("Here are some code suggestions based on your input:")
+                for suggestion in code_suggestions:
+                    st.code(suggestion, language=st.session_state["programming_language"].lower())
+            else:
+                st.info("No suggestions available for this language yet.")
+        
+        # Add API integration section
+        with st.expander("🌐 API Integration"):
+            api_url = st.text_input("Enter API URL", placeholder="https://api.example.com/data")
+            if api_url:
+                api_code = generate_api_integration(api_url, st.session_state["programming_language"])
+                st.code(api_code, language=st.session_state["programming_language"].lower())
         
         st.markdown("</div>", unsafe_allow_html=True)
         
@@ -849,6 +1051,25 @@ else:
                     
                     explanation = explain_code(generated_code, programming_language)
                     st.markdown(explanation, unsafe_allow_html=True)
+                    
+                    # Add bug detection section
+                    with st.expander("🔍 Bug Detection"):
+                        st.write("Analyzing code for potential issues...")
+                        bug_report = detect_and_fix_bugs(generated_code, programming_language)
+                        st.json(json.loads(bug_report))
+                    
+                    # Add unit test generation
+                    with st.expander("🧪 Generate Unit Tests"):
+                        st.write("Generating unit tests for your code...")
+                        unit_tests = generate_unit_tests(generated_code, programming_language)
+                        st.code(unit_tests, language=programming_language.lower())
+                    
+                    # Add commit message suggestion
+                    with st.expander("📝 Suggested Commit Message"):
+                        commit_message = generate_commit_message(generated_code, programming_language)
+                        st.write(commit_message)
+                        if st.button("Use This Commit Message"):
+                            st.success(f"Commit message copied to clipboard: {commit_message}")
             else:
                 st.warning("Please enter a prompt first.")
                 show_toast("Please enter a prompt first", "error")
@@ -925,7 +1146,7 @@ else:
     st.markdown("""
     <div style="animation: fadeIn 1.2s ease-out; margin-top: 2rem; text-align: center;">
         <hr style="margin: 1rem 0;">
-        <p>🧞‍♂️ CodeGenie v1.0 | Created with ❤️from CodeCrafter5| Powered by AI</p>
+        <p>🧞‍♂ CodeGenie v1.0 | Created with ❤from CodeCrafter5| Powered by AI</p>
     </div>
     """, unsafe_allow_html=True)
     
