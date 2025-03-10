@@ -6,14 +6,9 @@ import re
 from datetime import datetime
 from login import authenticate_user, initialize_user_database  # Import the login functions
 import time
-import speech_recognition as sr
 
 # Initialize the user database at startup
 initialize_user_database()
-
-# Initialize programming_language in session state if not already there
-if "programming_language" not in st.session_state:
-    st.session_state["programming_language"] = "Python"
 
 # Add custom CSS with animations and color scheme
 def load_css():
@@ -204,6 +199,35 @@ def load_css():
         50% { transform: translateY(-10px); }
         100% { transform: translateY(0px); }
     }
+
+    /* History items in sidebar */
+    .history-item {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 10px;
+        margin-bottom: 10px;
+        transition: all 0.3s ease;
+    }
+
+    .history-item:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+        transform: translateY(-2px);
+    }
+
+    .history-timestamp {
+        font-size: 0.8em;
+        color: rgba(255, 255, 255, 0.7);
+    }
+
+    .history-language {
+        font-weight: bold;
+        color: var(--accent);
+    }
+
+    .history-prompt {
+        font-style: italic;
+        margin: 5px 0;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -257,7 +281,7 @@ else:
     """, unsafe_allow_html=True)
 
     # Pre-configured API key (embedded for hackathon purposes)
-    DEFAULT_API_KEY ="api-key"
+    DEFAULT_API_KEY = "api-key"
 
     # Function to detect programming language from user's prompt
     def detect_language_from_prompt(prompt):
@@ -320,6 +344,185 @@ else:
         </div>
         """, unsafe_allow_html=True)
 
+    # Function to load history
+    def load_history():
+        history_entries = []
+        
+        # Check for history directory
+        if os.path.exists("history"):
+            # Get all history files
+            history_files = [f for f in os.listdir("history") if f.startswith("code_")]
+            history_files.sort(reverse=True)  # Sort by newest first
+            
+            for file in history_files:
+                with open(os.path.join("history", file), "r") as f:
+                    content = f.read()
+                
+                # Extract metadata
+                prompt = ""
+                language = ""
+                timestamp = ""
+                username = ""
+                code = ""
+                
+                lines = content.split("\n")
+                for i, line in enumerate(lines):
+                    if line.startswith("Prompt:"):
+                        prompt = line[len("Prompt:"):].strip()
+                    elif line.startswith("Language:"):
+                        language = line[len("Language:"):].strip()
+                    elif line.startswith("Timestamp:"):
+                        timestamp = line[len("Timestamp:"):].strip()
+                    elif line.startswith("User:"):
+                        username = line[len("User:"):].strip()
+                    elif line.startswith("--- Generated Code ---"):
+                        code = "\n".join(lines[i+2:])
+                        break
+                
+                # Only show entries for the current user
+                if username == st.session_state['username']:
+                    history_entries.append({
+                        "prompt": prompt,
+                        "language": language,
+                        "timestamp": timestamp,
+                        "username": username,
+                        "code": code,
+                        "file": file
+                    })
+        
+        return history_entries
+
+    # Sidebar for settings with animations
+    with st.sidebar:
+        st.markdown("""
+        <div style="animation: slideInLeft 0.6s ease-out;">
+            <h2>✨ Settings</h2>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # List of all supported programming languages
+        all_languages = [
+            "Python", "JavaScript", "Java", "C++", "C", "C#", "Go", "Ruby", 
+            "PHP", "Swift", "Kotlin", "Rust", "TypeScript", "HTML", "CSS", 
+            "SQL", "Shell/Bash", "Perl", "R", "MATLAB"
+        ]
+        
+        # Initialize programming_language in session state if not already there
+        if "programming_language" not in st.session_state:
+            st.session_state["programming_language"] = "Python"
+        
+        # Allow manual override with a checkbox
+        auto_detect = st.checkbox("Auto-detect language from prompt", value=True)
+        
+        # Only show manual selection if auto-detect is off
+        if not auto_detect:
+            programming_language = st.selectbox(
+                "Programming Language",
+                all_languages,
+                index=all_languages.index(st.session_state["programming_language"]) if st.session_state["programming_language"] in all_languages else 0
+            )
+            st.session_state["programming_language"] = programming_language
+        
+        # Model selection with visual indicators
+        st.markdown("""
+        <div style="animation: fadeIn 0.8s ease-out;">
+            <h3>Model Selection</h3>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        model_options = {
+            "Mistral 7B Instruct": "mistralai/Mistral-7B-Instruct-v0.2",
+            "CodeLlama 7B Instruct": "codellama/CodeLlama-7b-Instruct-hf",
+            "Bloomz 7B1": "bigscience/bloomz-7b1"
+        }
+        
+        # Prepare model cards with icons
+        models_html = ""
+        for model_name in model_options.keys():
+            icon = "🔮" if "Mistral" in model_name else "🦙" if "CodeLlama" in model_name else "🌸"
+            models_html += f"<option value='{model_name}'>{icon} {model_name}</option>"
+        
+        selected_model = st.selectbox("Select AI Model", list(model_options.keys()))
+        model_id = model_options[selected_model]
+        
+        # Hidden settings (not shown in UI but still stored)
+        max_length = 500  # default value
+        temperature = 0.7  # default value
+        api_key = DEFAULT_API_KEY  # default value
+        
+        # Add a divider before history section
+        st.markdown("<hr>", unsafe_allow_html=True)
+        
+        # History section in the sidebar
+        st.markdown("""
+        <div style="animation: fadeIn 0.8s ease-out;">
+            <h3>📜 History</h3>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Load history entries
+        history_entries = load_history()
+        
+        if not history_entries:
+            st.info("No history found. Generate some code first!")
+        else:
+            # Show limited history in sidebar (latest 5 entries)
+            for i, entry in enumerate(history_entries[:5]):
+                # Use custom HTML for compact history display
+                st.markdown(f"""
+                <div class="history-item">
+                    <div class="history-timestamp">{entry['timestamp']}</div>
+                    <div class="history-language">{entry['language']}</div>
+                    <div class="history-prompt">{entry['prompt'][:50]}{'...' if len(entry['prompt']) > 50 else ''}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Create a unique key for each expander
+                with st.expander("Show Code", expanded=False):
+                    # Determine language for syntax highlighting
+                    highlight_lang = entry['language'].lower()
+                    if highlight_lang == "shell/bash":
+                        highlight_lang = "bash"
+                    
+                    st.code(entry['code'], language=highlight_lang)
+                    
+                    # Add download button for this history entry
+                    file_ext = file_extensions.get(entry['language'], entry['language'].lower())
+                    timestamp_str = entry['timestamp'].replace(':', '-').replace(' ', '_')
+                    st.download_button(
+                        label=f"📄 Download Code",
+                        data=entry['code'],
+                        file_name=f"history_{timestamp_str}.{file_ext}",
+                        mime="text/plain",
+                        key=f"dl_hist_{i}"
+                    )
+        
+        # Add a logout button to the sidebar with animation
+        st.markdown("<hr>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style="animation: fadeIn 1s ease-out;">
+        """, unsafe_allow_html=True)
+        if st.button("Logout"):
+            # Add a logout animation
+            st.markdown("""
+            <div style="text-align: center; animation: fadeIn 0.5s ease-out;">
+                <p>Logging out...</p>
+            </div>
+            """, unsafe_allow_html=True)
+            time.sleep(1)  # Brief pause for animation
+            st.session_state["authenticated"] = False
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        st.markdown("---")
+        st.markdown("""
+        <div style="animation: slideInLeft 1s ease-out;">
+            <h3>About CodeGenie</h3>
+            <p>CodeGenie uses AI models to generate code based on natural language descriptions.
+            This tool helps developers save time and reduce errors by automating code generation.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
     # Function to generate code using Hugging Face Inference API
     def generate_code_api(prompt, language, model_id, max_length, temperature, api_key=DEFAULT_API_KEY):
         # API endpoint
@@ -332,16 +535,7 @@ else:
         }
         
         # Construct the full prompt based on the model and language
-        language_file_extension = {
-            "Python": "py", "JavaScript": "js", "Java": "java", "C++": "cpp", 
-            "C": "c", "C#": "cs", "Go": "go", "Ruby": "rb", "PHP": "php",
-            "Swift": "swift", "Kotlin": "kt", "Rust": "rs", "TypeScript": "ts",
-            "HTML": "html", "CSS": "css", "SQL": "sql", "Shell/Bash": "sh",
-            "Perl": "pl", "R": "r", "MATLAB": "m"
-        }
-        
-        # Default extension if language not found
-        file_ext = language_file_extension.get(language, language.lower())
+        file_ext = file_extensions.get(language, language.lower())
         
         # Special handling for HTML/CSS/JS combined projects
         is_web_project = False
@@ -427,13 +621,23 @@ else:
                 # Extract only the code part (after the prompt)
                 code_part = generated_text[len(full_prompt):]
                 
-                # Clean up the code (remove trailing backticks if any)
+                # Improved code extraction logic
+                # Check for code blocks with triple backticks
                 if "```" in code_part:
-                    code_parts = code_part.split("```")
-                    if len(code_parts) > 1:
-                        code_part = code_parts[1]
+                    # Extract code between backticks
+                    code_blocks = re.findall(r'```(?:\w*\n)?(.*?)```', code_part, re.DOTALL)
+                    if code_blocks:
+                        # Join multiple code blocks if present
+                        code_part = "\n\n".join(code_blocks)
                     else:
-                        code_part = code_parts[0]
+                        # If regex failed but backticks exist, try simple split
+                        parts = code_part.split("```")
+                        if len(parts) > 1:
+                            # Get the content after the first ``` and before the next ```
+                            code_part = parts[1].strip()
+                
+                # Remove language identifier if it appears at the beginning of the code
+                code_part = re.sub(r'^(?:python|javascript|java|cpp|c\+\+|c#|go|ruby|php|swift|kotlin|rust|typescript|html|css|sql|bash|perl|r|matlab)\n', '', code_part, flags=re.IGNORECASE)
                 
                 return code_part.strip(), None
             else:
@@ -534,676 +738,185 @@ else:
             f.write(f"Prompt: {prompt}\n")
             f.write(f"Language: {language}\n")
             f.write(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write(f"User: {st.session_state['username']}\n")  # Added username to history
+            f.write(f"User: {st.session_state['username']}\n")
+            f.write(f"Model: {selected_model}\n")
             f.write("\n--- Generated Code ---\n\n")
             f.write(code)
-
-    # Function to detect and fix bugs in code
-    def detect_and_fix_bugs(code, language):
-        # This would integrate with a code analysis API or static analysis tool
-        # For demonstration, we'll return dummy data
-        bug_report = {
-            "bugs": [
-                {
-                    "line": 5,
-                    "message": "Potential null pointer dereference",
-                    "suggestion": "Add null check before using this variable"
-                },
-                {
-                    "line": 10,
-                    "message": "SQL injection vulnerability",
-                    "suggestion": "Use parameterized queries instead of string concatenation"
-                }
-            ],
-            "security_issues": [
-                {
-                    "line": 15,
-                    "message": "Hardcoded password",
-                    "suggestion": "Store credentials in environment variables"
-                }
-            ]
-        }
-        return json.dumps(bug_report, indent=2)
-
-    # Function to get code autocomplete suggestions
-    def get_code_autocomplete(prompt, language):
-        # This would integrate with a code completion API
-        # For demonstration, we'll return dummy suggestions
-        suggestions = {
-            "Python": [
-                "def calculate_average(numbers):",
-                "    if not numbers:",
-                "        return 0",
-                "    return sum(numbers) / len(numbers)"
-            ],
-            "JavaScript": [
-                "function calculateAverage(numbers) {",
-                "    if (numbers.length === 0) {",
-                "        return 0;",
-                "    }",
-                "    return numbers.reduce((a, b) => a + b) / numbers.length;",
-                "}"
-            ]
-        }
-        return suggestions.get(language, [])
-
-    # Function to generate unit tests
-    def generate_unit_tests(code, language):
-        # This would integrate with a testing framework or AI model
-        # For demonstration, we'll return dummy tests
-        test_templates = {
-            "Python": [
-                "def test_function_with_valid_input():",
-                "    assert function_to_test(2, 3) == 5",
-                "",
-                "def test_function_with_edge_case():",
-                "    assert function_to_test(0, 0) == 0"
-            ],
-            "JavaScript": [
-                "test('function with valid input', () => {",
-                "    expect(functionToTest(2, 3)).toBe(5);",
-                "});",
-                "",
-                "test('function with edge case', () => {",
-                "    expect(functionToTest(0, 0)).toBe(0);",
-                "});"
-            ]
-        }
-        return "\n".join(test_templates.get(language, []))
-
-    # Function to generate API integration code
-    def generate_api_integration(prompt, language):
-        # This would integrate with API documentation or AI model
-        # For demonstration, we'll return dummy API code
-        api_templates = {
-            "Python": [
-                "import requests",
-                "",
-                "def get_data_from_api(api_url):",
-                "    response = requests.get(api_url)",
-                "    if response.status_code == 200:",
-                "        return response.json()",
-                "    else:",
-                "        raise Exception(f'API request failed: {response.status_code}')"
-            ],
-            "JavaScript": [
-                "async function fetchDataFromAPI(apiUrl) {",
-                "    try {",
-                "        const response = await fetch(apiUrl);",
-                "        if (!response.ok) {",
-                "            throw new Error('Network response was not ok');",
-                "        }",
-                "        return await response.json();",
-                "    } catch (error) {",
-                "        console.error('Error:', error);",
-                "    }",
-                "}"
-            ]
-        }
-        return "\n".join(api_templates.get(language, []))
-
-    # Function to generate commit message
-    def generate_commit_message(code_changes, language):
-        # This would analyze code changes to generate meaningful commit messages
-        # For demonstration, we'll return a simple message
-        return f"Add {language} implementation for {code_changes[:20]}..."
-
-    # Function to generate algorithm suggestions
-    def generate_algorithm(prompt):
-        # Identify key components from the prompt
-        components = {
-            "sort": "sorting algorithm",
-            "search": "search algorithm",
-            "calculate": "mathematical operations",
-            "database": "database operations",
-            "api": "API integration",
-            "authentication": "authentication system",
-            "gui": "graphical user interface",
-            "web": "web application",
-            "mobile": "mobile application"
-        }
         
-        # Basic algorithm template
-        algorithm = [
-            "1. Understand the problem requirements from the input description.",
-            "2. Identify the main goal of the functionality.",
-            "3. Break down the problem into smaller sub-tasks.",
-            "4. Determine the appropriate data structures and algorithms for each sub-task.",
-            "5. Outline the step-by-step process to solve the problem.",
-            "6. Consider edge cases and validation requirements.",
-            "7. Document the algorithm with comments and explanations."
-        ]
-        
-        # Add specific steps based on identified components
-        for keyword, description in components.items():
-            if keyword in prompt.lower():
-                algorithm.append(f"8. Implement the {description}.")
-        
-        # Add implementation steps
-        algorithm.extend([
-            "",
-            "Implementation Steps:",
-            "1. Set up the project environment and dependencies.",
-            "2. Create the main structure for the application.",
-            "3. Implement core functionality following the outlined algorithm.",
-            "4. Add error handling and input validation.",
-            "5. Write unit tests for each component.",
-            "6. Perform integration testing.",
-            "7. Optimize performance where necessary.",
-            "8. Document the code and create user documentation."
-        ])
-        
-        return "\n".join(algorithm)
+        return filename
 
-    # Sidebar for settings with animations
-    with st.sidebar:
+    # Main sections with tabs and animations
+    tab1, tab2 = st.tabs(["💻 Generate Code", "📊 History"])
+    
+    with tab1:
         st.markdown("""
         <div style="animation: slideInLeft 0.6s ease-out;">
-            <h2>✨ Settings</h2>
+            <h2>✨ Generate Code</h2>
+            <p>Describe what you want to build, and CodeGenie will generate the code for you.</p>
         </div>
         """, unsafe_allow_html=True)
         
-        # List of all supported programming languages
-        all_languages = [
-            "Python", "JavaScript", "Java", "C++", "C", "C#", "Go", "Ruby", 
-            "PHP", "Swift", "Kotlin", "Rust", "TypeScript", "HTML", "CSS", 
-            "SQL", "Shell/Bash", "Perl", "R", "MATLAB"
-        ]
+        # Get the prompt from the user
+        prompt = st.text_area("Describe what you want to code:", height=150, 
+                              placeholder="Example: Create a function that takes a list of numbers and returns the sum of all even numbers")
         
-        # Initialize programming_language in session state if not already there
-        if "programming_language" not in st.session_state:
-            st.session_state["programming_language"] = "Python"
-        
-        # Allow manual override with a checkbox
-        auto_detect = st.checkbox("Auto-detect language from prompt", value=True)
-        
-        # Only show manual selection if auto-detect is off
-        if not auto_detect:
-            programming_language = st.selectbox(
-                "Programming Language",
-                all_languages,
-                index=all_languages.index(st.session_state["programming_language"]) if st.session_state["programming_language"] in all_languages else 0
-            )
-            st.session_state["programming_language"] = programming_language
-        
-        # Model selection with visual indicators
-        st.markdown("""
-        <div style="animation: fadeIn 0.8s ease-out;">
-            <h3>Model Selection</h3>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        model_options = {
-            "Mistral 7B Instruct": "mistralai/Mistral-7B-Instruct-v0.2",
-            "CodeLlama 7B Instruct": "codellama/CodeLlama-7b-Instruct-hf",
-            "Bloomz 7B1": "bigscience/bloomz-7b1"
-        }
-        
-        # Prepare model cards with icons
-        models_html = ""
-        for model_name in model_options.keys():
-            icon = "🔮" if "Mistral" in model_name else "🦙" if "CodeLlama" in model_name else "🌸"
-            models_html += f"<option value='{model_name}'>{icon} {model_name}</option>"
-        
-        selected_model = st.selectbox("Select AI Model", list(model_options.keys()))
-        model_id = model_options[selected_model]
-        
-        # Hidden settings (not visible to user but still functional)
-        max_length = 500  # Default value
-        temperature = 0.7  # Default value
-        api_key = DEFAULT_API_KEY  # Default value
-        
-        # Add a history tab directly in the sidebar
-        st.markdown("""
-        <div style="animation: fadeIn 0.8s ease-out;">
-            <h3>Your Code History</h3>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Create history directory if it doesn't exist
-        if not os.path.exists("history"):
-            os.makedirs("history")
-        
-        # Get list of history files specific to the current user
-        history_files = []
-        for filename in os.listdir("history"):
-            if filename.startswith("code_") and filename.endswith(".txt"):
-                # Read the file to check if it belongs to the current user
-                with open(os.path.join("history", filename), "r") as f:
-                    content = f.read()
-                    if f"User: {st.session_state['username']}" in content:
-                        history_files.append(filename)
-        
-        # Sort by timestamp (newest first)
-        history_files.sort(reverse=True)
-        
-        if not history_files:
-            st.info("No code history found. Generate some code first!")
-        else:
-            # Create history cards with animation
-            for i, filename in enumerate(history_files):
-                with open(os.path.join("history", filename), "r") as f:
-                    content = f.read()
-                
-                # Extract metadata
-                prompt = "Unknown"
-                language = "Unknown"
-                timestamp = "Unknown"
-                
-                for line in content.split("\n"):
-                    if line.startswith("Prompt:"):
-                        prompt = line[8:].strip()
-                    elif line.startswith("Language:"):
-                        language = line[10:].strip()
-                    elif line.startswith("Timestamp:"):
-                        timestamp = line[11:].strip()
-                    elif line.startswith("--- Generated Code ---"):
-                        break
-                
-                # Extract the code
-                code_parts = content.split("--- Generated Code ---")
-                if len(code_parts) > 1:
-                    code = code_parts[1].strip()
-                else:
-                    code = "No code found"
-                
-                # Create a card for each history item with staggered animation
-                st.markdown(f"""
-                <div style="animation: slideInLeft {0.5 + i*0.1}s ease-out;">
-                    <h4>{language} - {timestamp.split()[0]}</h4>
-                    <p style="font-size: 0.9em;">{prompt[:75]}{"..." if len(prompt) > 75 else ""}</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Determine language for syntax highlighting
-                highlight_lang = language.lower()
-                if highlight_lang == "shell/bash":
-                    highlight_lang = "bash"
-                
-                with st.expander("Show Code"):
-                    st.code(code, language=highlight_lang)
-                    
-                    # File extension for download
-                    file_ext = file_extensions.get(language, language.lower())
-                    
-                    # Create download button for this history item
-                    st.download_button(
-                        label="📥 Download This Code",
-                        data=code,
-                        file_name=f"history_code_{filename.replace('.txt', '')}.{file_ext}",
-                        mime="text/plain"
-                    )
-                
-                st.markdown("<hr style='margin: 8px 0; opacity: 0.3;'>", unsafe_allow_html=True)
-        
-        # Add a logout button to the sidebar with animation
-        st.markdown("""
-        <div style="animation: fadeIn 1s ease-out; margin-top: 20px;">
-        """, unsafe_allow_html=True)
-        if st.button("Logout"):
-            # Add a logout animation
-            st.markdown("""
-            <div style="text-align: center; animation: fadeIn 0.5s ease-out;">
-                <p>Logging out...</p>
-            </div>
-            """, unsafe_allow_html=True)
-            time.sleep(1)  # Brief pause for animation
-            st.session_state["authenticated"] = False
-            st.session_state.pop("username", None)
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        st.markdown("---")
-        st.markdown("""
-        <div style="animation: slideInLeft 1s ease-out;">
-            <h3>About CodeGenie</h3>
-            <p>CodeGenie uses AI models to generate code based on natural language descriptions.
-            This tool helps developers save time and reduce errors by automating code generation.</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # Add tabs for different features with animated transitions
-    st.markdown("""
-    <div style="animation: fadeIn 1s ease-out;">
-    """, unsafe_allow_html=True)
-    
-    tab1, tab2 = st.tabs(["✨ Generate Code", "❓ Help"])
-
-    with tab1:
-        # Main input area with animation
-        st.markdown("""
-        <div style="animation: slideInLeft 0.8s ease-out;">
-        """, unsafe_allow_html=True)
-        
-        user_prompt = st.text_area("Describe the functionality you need:", 
-                                   value=st.session_state.get("user_prompt", ""), 
-                                   height=150, 
-                                   placeholder="Example: Create a Python function that takes a list of numbers and returns the average of the even numbers. Or: Create an HTML page with a responsive navbar and contact form using CSS.")
-        
-        # Update the session state with the current value of the text area
-        st.session_state["user_prompt"] = user_prompt
-
-        # Add a microphone button for speech input
-        if st.button("🎤 Use Microphone"):
-            # Initialize recognizer
-            recognizer = sr.Recognizer()
-            
-            # Capture audio from microphone
-            with sr.Microphone() as source:
-                st.write("Please speak now...")
-                audio = recognizer.listen(source)
-            
-            # Convert speech to text
-            try:
-                transcribed_text = recognizer.recognize_google(audio)
-                st.write("You said:", transcribed_text)
-                
-                # Update the text area with the transcribed text
-                st.session_state["user_prompt"] = transcribed_text
-                user_prompt = transcribed_text  # Ensure the local variable is also updated
-            except sr.UnknownValueError:
-                st.error("Sorry, I did not understand that.")
-            except sr.RequestError as e:
-                st.error(f"Could not request results; {e}")
-
-        # The rest of your code remains unchanged
-        
-        # Advanced options (collapsed by default)
-        with st.expander("Advanced Options"):
-            st.markdown("""
-            <div style="animation: fadeIn 0.8s ease-out;">
-            """, unsafe_allow_html=True)
-            
-            # Add some extra customization options
-            st.markdown("#### Code Generation Options")
-            
-            # Allow setting code length (number of lines)
-            code_length = st.slider("Approximate Code Length (lines)", 
-                                   min_value=10, max_value=100, value=30, step=5)
-            
-            # Allow specifying code style
-            code_style = st.selectbox("Code Style", 
-                                     ["Standard", "Concise", "Heavily Commented", "Production Ready"])
-            
-            # Allow additional requirements
-            additional_reqs = st.text_area("Additional Requirements", 
-                                          placeholder="Enter any additional requirements or specifications...")
-            
-            st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Add code autocomplete suggestions and algorithm suggestions
-        with st.expander("💡 Suggestions"):
-            # Get algorithm suggestions
-            algorithm_suggestions = generate_algorithm(user_prompt)
-            
-            # Display algorithm suggestions
-            st.subheader("Algorithm Suggestions")
-            st.write("Here's a suggested algorithm based on your input:")
-            st.code(algorithm_suggestions)
-            
-            # Get code suggestions
-            code_suggestions = get_code_autocomplete(user_prompt, st.session_state["programming_language"])
-            
-            # Display code suggestions
-            if code_suggestions:
-                st.subheader("Code Suggestions")
-                st.write("Here are some code suggestions based on your input:")
-                for suggestion in code_suggestions:
-                    st.code(suggestion, language=st.session_state["programming_language"].lower())
+        # Generate code when the Generate button is clicked
+        if st.button("🪄 Generate Code"):
+            # Check if the prompt is empty
+            if not prompt:
+                st.error("Please enter a description of what you want to code.")
             else:
-                st.info("No suggestions available for this language yet.")
-        
-        # Add API integration section
-        with st.expander("🌐 API Integration"):
-            api_url = st.text_input("Enter API URL", placeholder="https://api.example.com/data")
-            if api_url:
-                api_code = generate_api_integration(api_url, st.session_state["programming_language"])
-                st.code(api_code, language=st.session_state["programming_language"].lower())
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Generate code button with animation
-        st.markdown("""
-        <div style="animation: slideInRight 1s ease-out;">
-        """, unsafe_allow_html=True)
-        
-        if st.button("🪄 Generate Code", use_container_width=True):
-            if user_prompt:
-                # Auto-detect language if enabled
-                if "auto_detect" in st.session_state and st.session_state["auto_detect"]:
-                    detected_language = detect_language_from_prompt(user_prompt)
-                    st.session_state["programming_language"] = detected_language
-                    st.info(f"Auto-detected language: {detected_language}")
-                
-                # Get the current programming language from session state
-                programming_language = st.session_state["programming_language"]
-                
-                # Update prompt with additional requirements if provided
-                full_prompt = user_prompt
-                if 'additional_reqs' in locals() and additional_reqs:
-                    full_prompt += f"\n\nAdditional requirements: {additional_reqs}"
-                
-                # Update prompt with code style if provided
-                if 'code_style' in locals() and code_style != "Standard":
-                    full_prompt += f"\n\nPlease make the code {code_style.lower()}."
-                
-                # Update prompt with code length if provided
-                if 'code_length' in locals():
-                    full_prompt += f"\n\nThe code should be approximately {code_length} lines long."
-                
-                # Display loading animation
+                # Show loading animation
                 with st.spinner():
                     show_loading_animation()
                     
-                    # Call the API to generate code
+                    # Auto-detect language if enabled
+                    if auto_detect:
+                        detected_language = detect_language_from_prompt(prompt)
+                        st.session_state["programming_language"] = detected_language
+                    
+                    # Generate the code
                     generated_code, error = generate_code_api(
-                        full_prompt, 
-                        programming_language,
-                        model_id,
-                        max_length,
-                        temperature,
-                        api_key=DEFAULT_API_KEY
+                        prompt, 
+                        st.session_state["programming_language"], 
+                        model_id, 
+                        max_length, 
+                        temperature, 
+                        api_key
                     )
+                    
+                    # Hide the loading animation
+                    st.empty()
                 
-                # Handle the response
+                # Display the results or error
                 if error:
                     st.error(f"Error generating code: {error}")
-                    show_toast("Error generating code", "error")
+                    show_toast("Failed to generate code", type="error")
                 else:
-                    # Save to history
-                    save_code_history(user_prompt, programming_language, generated_code)
-                    
-                    # Show the generated code with syntax highlighting
-                    st.markdown("""
-                    <div style="animation: fadeIn 1s ease-out;">
-                        <h3>✨ Generated Code:</h3>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Determine language for syntax highlighting
-                    highlight_lang = programming_language.lower()
+                    # Determine language for code highlighting
+                    highlight_lang = st.session_state["programming_language"].lower()
                     if highlight_lang == "shell/bash":
                         highlight_lang = "bash"
                     
-                    st.code(generated_code, language=highlight_lang)
+                    # Show notification about language detection if auto-detect was used
+                    if auto_detect:
+                        st.info(f"CodeGenie detected you want code in: {st.session_state['programming_language']}")
                     
-                    # Show toast notification
-                    show_toast("Code generated successfully!")
-                    
-                    # Add download button
-                    file_ext = file_extensions.get(programming_language, programming_language.lower())
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    
-                    st.download_button(
-                        label="📥 Download Code",
-                        data=generated_code,
-                        file_name=f"generated_code_{timestamp}.{file_ext}",
-                        mime="text/plain",
-                        use_container_width=True
-                    )
-                    
-                    # Add code explanation with animation
+                    # Display the generated code with animation
                     st.markdown("""
-                    <div style="animation: slideInRight 1.2s ease-out;">
-                        <h3>🔍 Code Explanation:</h3>
+                    <div style="animation: fadeIn 0.8s ease-out;">
+                        <h3>✅ Generated Code:</h3>
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    explanation = explain_code(generated_code, programming_language)
-                    st.markdown(explanation, unsafe_allow_html=True)
+                    st.code(generated_code, language=highlight_lang)
                     
-                    # Add bug detection section
-                    with st.expander("🔍 Bug Detection"):
-                        st.write("Analyzing code for potential issues...")
-                        bug_report = detect_and_fix_bugs(generated_code, programming_language)
-                        st.json(json.loads(bug_report))
+                    # Save to history
+                    history_file = save_code_history(prompt, st.session_state["programming_language"], generated_code)
                     
-                    # Add unit test generation
-                    with st.expander("🧪 Generate Unit Tests"):
-                        st.write("Generating unit tests for your code...")
-                        unit_tests = generate_unit_tests(generated_code, programming_language)
-                        st.code(unit_tests, language=programming_language.lower())
+                    # Show success notification
+                    show_toast("Code successfully generated!")
                     
-                    # Add commit message suggestion
-                    with st.expander("📝 Suggested Commit Message"):
-                        commit_message = generate_commit_message(generated_code, programming_language)
-                        st.write(commit_message)
-                        if st.button("Use This Commit Message"):
-                            st.success(f"Commit message copied to clipboard: {commit_message}")
-            else:
-                st.warning("Please enter a prompt first.")
-                show_toast("Please enter a prompt first", "error")
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-    
+                    # Prepare file extension for download
+                    file_ext = file_extensions.get(st.session_state["programming_language"], 
+                                                   st.session_state["programming_language"].lower())
+                    
+                    # Create columns for the buttons
+                    col1, col2 = st.columns(2)
+                    
+                    # Download button
+                    with col1:
+                        st.download_button(
+                            label="📄 Download Code",
+                            data=generated_code,
+                            file_name=f"generated_code.{file_ext}",
+                            mime="text/plain"
+                        )
+                    
+                    # Copy to clipboard button (uses JavaScript)
+                    with col2:
+                        escaped_code = generated_code.replace('`', '\\`').replace('\\', '\\\\').replace('$', '\\$')
+                        st.markdown(f"""
+                        <button onclick="
+                            navigator.clipboard.writeText(`{escaped_code}`)
+                            .then(() => alert('Code copied to clipboard!'))
+                            .catch(err => alert('Error copying code: ' + err));
+                        " style="
+                            background: linear-gradient(135deg, #43CBFF 10%, #9708CC 100%);
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            padding: 0.5rem 1rem;
+                            transition: all 0.3s ease;
+                            transform: translateY(0);
+                            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                            cursor: pointer;
+                            width: 100%;
+                        ">📋 Copy to Clipboard</button>
+                        """, unsafe_allow_html=True)
+
     with tab2:
-        # Help tab with animation
         st.markdown("""
-        <div style="animation: fadeIn 0.8s ease-out;">
-            <h3>How to Use CodeGenie</h3>
-            
-            <div class="card">
-                <h4>Step 1: Describe what you want</h4>
-                <p>Start by clearly describing the functionality you need. The more specific your description, the better the results.</p>
-                
-                <p><strong>Good example:</strong> "Create a Python function that takes a list of numbers, filters out the negative values, and returns the sum of the squares of the remaining positive numbers."</p>
-                
-                <p><strong>Weak example:</strong> "Make a function that handles numbers."</p>
-            </div>
-            
-            <div class="card">
-                <h4>Step 2: Select language or use auto-detect</h4>
-                <p>You can either:</p>
-                <ul>
-                    <li>Keep "Auto-detect language from prompt" checked to let CodeGenie determine the programming language</li>
-                    <li>Uncheck this option and manually select your preferred language</li>
-                </ul>
-            </div>
-            
-            <div class="card">
-                <h4>Step 3: Choose a model</h4>
-                <p>Select an AI model based on your needs:</p>
-                <ul>
-                    <li><strong>Mistral 7B Instruct:</strong> Good general-purpose code generation</li>
-                    <li><strong>CodeLlama 7B Instruct:</strong> Specialized for code generation</li>
-                    <li><strong>Bloomz 7B1:</strong> Another option with different capabilities</li>
-                </ul>
-            </div>
-            
-            <div class="card">
-                <h4>Step 4: Generate and use the code</h4>
-                <p>Click "Generate Code" and:</p>
-                <ul>
-                    <li>Review the generated code</li>
-                    <li>Read the explanation to understand how it works</li>
-                    <li>Download the code if you want to use it</li>
-                    <li>Access your code history from the sidebar</li>
-                </ul>
-            </div>
-            
-            <h3>Tips for Better Results</h3>
-            <ul>
-                <li>Be specific about functionality, inputs, and outputs</li>
-                <li>Mention error handling if needed</li>
-                <li>Specify any libraries or frameworks you want to use</li>
-                <li>Use the "Additional Requirements" field for extra details</li>
-                <li>Try different models if you're not satisfied with the results</li>
-            </ul>
+        <div style="animation: slideInRight 0.6s ease-out;">
+            <h2>📚 Code History</h2>
+            <p>View your previously generated code snippets.</p>
         </div>
         """, unsafe_allow_html=True)
-        st.markdown("""
-        <div class="card">
-            <h4>Keyboard Shortcuts</h4>
-            <ul>
-                <li><strong>Ctrl + Enter:</strong> Submit input in text areas</li>
-                <li><strong>Esc:</strong> Unfocus text input</li>
-                <li><strong>Ctrl + F:</strong> Search within the page</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Footer section with animation
-    st.markdown("""
-    <div style="animation: fadeIn 1.2s ease-out; margin-top: 2rem; text-align: center;">
-        <hr style="margin: 1rem 0;">
-        <p>🧞‍♂ CodeGenie v1.0 | Created with ❤from CodeCrafter5| Powered by AI</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Debug mode (hidden, can be enabled for troubleshooting)
-    debug_mode = False
-    if debug_mode:
-        with st.expander("Debug Information", expanded=False):
-            st.write("### Session State")
-            st.write(st.session_state)
-            
-            st.write("### Current Settings")
-            selected_model = "Mistral 7B Instruct"  # Define the selected_model variable
-            model_id = "mistral-7b-instruct"  # Define the model_id variable
-            max_length = 50  # Define a default value for max_length
-            temperature = 0.7  # Define a default value for temperature
-            st.write({
-                "Model": selected_model,
-                "Programming Language": st.session_state.get("programming_language", "Python"),
-                "Max Length": max_length,
-                "Temperature": temperature
-            })
-
-# Error handling for the entire app
-try:
-    # Main app execution would happen here
-    pass
-except Exception as e:
-    st.error(f"An unexpected error occurred: {str(e)}")
-    
-    # Log the error (in a production environment, you might want to save this to a file)
-    print(f"Error: {str(e)}")
-    
-    # Offer a way to recover
-    if st.button("Reset Application"):
-        # Clear certain session state items
-        for key in ["programming_language"]:
-            if key in st.session_state:
-                del st.session_state[key]
         
-        # Rerun the app
-        st.rerun()
+        # Load all history entries
+        history_entries = load_history()
+        
+        if not history_entries:
+            st.info("No code generation history found. Generate some code first!")
+        else:
+            # Display history in reverse chronological order with cards
+            for i, entry in enumerate(history_entries):
+                with st.expander(f"{entry['timestamp']} - {entry['language']}: {entry['prompt'][:50]}...", expanded=(i == 0)):
+                    # Determine language for syntax highlighting
+                    highlight_lang = entry['language'].lower()
+                    if highlight_lang == "shell/bash":
+                        highlight_lang = "bash"
+                    
+                    # Display the code
+                    st.code(entry['code'], language=highlight_lang)
+                    
+                    # Create columns for buttons
+                    col1, col2 = st.columns(2)
+                    
+                    # Download button
+                    with col1:
+                        file_ext = file_extensions.get(entry['language'], entry['language'].lower())
+                        timestamp_str = entry['timestamp'].replace(':', '-').replace(' ', '_')
+                        st.download_button(
+                            label="📄 Download Code",
+                            data=entry['code'],
+                            file_name=f"history_{timestamp_str}.{file_ext}",
+                            mime="text/plain",
+                            key=f"dl_{i}"
+                        )
+                    
+                    # Copy to clipboard button
+                    with col2:
+                        escaped_code = entry['code'].replace('`', '\\`').replace('\\', '\\\\').replace('$', '\\$')
+                        st.markdown(f"""
+                        <button onclick="
+                            navigator.clipboard.writeText(`{escaped_code}`)
+                            .then(() => alert('Code copied to clipboard!'))
+                            .catch(err => alert('Error copying code: ' + err));
+                        " style="
+                            background: linear-gradient(135deg, #43CBFF 10%, #9708CC 100%);
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            padding: 0.5rem 1rem;
+                            transition: all 0.3s ease;
+                            transform: translateY(0);
+                            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                            cursor: pointer;
+                            width: 100%;
+                        ">📋 Copy to Clipboard</button>
+                        """, unsafe_allow_html=True)
 
-# Add event handlers for client-side interactivity
-st.markdown("""
-<script>
-    // JavaScript functions for additional interactivity
-    // Note: This is limited in Streamlit but included for demonstration
-    
-    // Auto-hide toast notifications after 3 seconds
-    setTimeout(function() {
-        const toast = document.getElementById('toast');
-        if (toast) {
-            toast.style.opacity = '0';
-            setTimeout(function() {
-                toast.style.display = 'none';
-            }, 500);
-        }
-    }, 3000);
-</script>
-""", unsafe_allow_html=True)
+# Run the app when this script is executed
+if __name__ == "__main__":
+    pass  # The Streamlit app runs automatically
